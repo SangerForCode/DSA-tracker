@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Striver's A2Z DSA Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Babel for JSX compilation in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { margin: 0; font-family: sans-serif; }
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        // Imports - Pinned versions to ensure single React instance
+        import React, { useState, useEffect, useMemo, useRef } from 'https://esm.sh/react@18.2.0';
+        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+        
+        // Lucide React - Pinned to use same React version to avoid context conflicts
+        import { 
+            CheckCircle2, 
+            Circle, 
+            MessageSquare, 
+            Clock, 
+            ChevronDown, 
+            ChevronRight, 
+            X, 
+            Map, 
+            ListTodo, 
+            Scale, 
+            Star, 
+            RefreshCw, 
+            Trophy, 
+            BrainCircuit, 
+            Target, 
+            AlertTriangle,
+            CalendarClock
+        } from 'https://esm.sh/lucide-react@0.292.0?deps=react@18.2.0';
+
+        // Firebase Imports (Modular SDK from gstatic)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            onAuthStateChanged 
+        } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { 
+            getFirestore, 
+            doc, 
+            setDoc, 
+            getDoc, 
+            collection, 
+            addDoc, 
+            onSnapshot, 
+            query, 
+            orderBy, 
+            serverTimestamp, 
+            updateDoc 
+        } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        // --- FIREBASE CONFIGURATION (Provided by User) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDWLhWw57jKLijnq99AJHnAmoG-UGkNjSs",
+            authDomain: "dsa-t-8139b.firebaseapp.com",
+            projectId: "dsa-t-8139b",
+            storageBucket: "dsa-t-8139b.firebasestorage.app",
+            messagingSenderId: "400481081048",
+            appId: "1:400481081048:web:5dab7625d5358385cb69ad",
+            measurementId: "G-TE37C07L1R"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Constants
+        const APP_ID = "dsa-tracker-prod"; 
+
+        // --- DATA: Striver's A2Z DSA Course (Mapped to Phases) ---
+        const COURSE_DATA = [
+            // --- PHASE 0: Setup & Orientation ---
+            {
+                category: "Basics & C++",
+                phase: 0,
+                description: "Remove friction. Setup env. Learn basics.",
+                videos: [
+                { id: 1, title: "Don't watch my A2Z DSA Course", duration: "8:24" },
+                { id: 2, title: "How to setup VS code for DSA and CP", duration: "8:51" },
+                { id: 3, title: "C++ Basics in One Shot", duration: "1:26:27" },
+                { id: 4, title: "Time and Space Complexity", duration: "35:16" },
+                { id: 5, title: "Solve any Pattern Question", duration: "1:22:06" },
+                { id: 6, title: "Complete C++ STL in 1 Video", duration: "1:07:37" },
+                { id: 7, title: "Basic Maths for DSA", duration: "1:03:20" },
+                ]
+            },
+            
+            // --- PHASE 1: Foundations ---
+            {
+                category: "Recursion",
+                phase: 1,
+                description: "Build thinking muscles. Logic > Speed.",
+                videos: [
+                { id: 8, title: "Re 1. Introduction to Recursion", duration: "22:46" },
+                { id: 9, title: "Re 2. Problems on Recursion", duration: "22:04" },
+                { id: 10, title: "Re 3. Parameterised and Functional Recursion", duration: "18:14" },
+                { id: 11, title: "Re 4. Problems on Functional Recursion", duration: "19:48" },
+                { id: 12, title: "Re 5. Multiple Recursion Calls", duration: "16:45" },
+                ]
+            },
+            {
+                category: "Arrays & Hashing",
+                phase: 1,
+                description: "Mastering the most common data structures.",
+                videos: [
+                { id: 13, title: "Hashing | Maps | Time Complexity", duration: "1:00:06" },
+                { id: 14, title: "Sorting - Part 1", duration: "43:44" },
+                { id: 15, title: "Merge Sort | Algorithm", duration: "49:43" },
+                { id: 16, title: "Quick Sort For Beginners", duration: "35:17" },
+                { id: 17, title: "Find Second Largest Element in Array", duration: "43:26" },
+                { id: 18, title: "Rotate Array by K places", duration: "1:13:17" },
+                { id: 19, title: "Find element that appears once", duration: "38:00" },
+                { id: 20, title: "Longest Subarray with sum K", duration: "41:42" },
+                { id: 21, title: "2 Sum Problem", duration: "18:20" },
+                { id: 22, title: "Sort an array of 0's 1's & 2's", duration: "25:07" },
+                { id: 23, title: "Majority Element I", duration: "18:13" },
+                { id: 24, title: "Kadane's Algorithm", duration: "20:09" },
+                { id: 25, title: "DP 35. Best Time to Buy and Sell Stock", duration: "9:11" },
+                { id: 26, title: "Rearrange Array Elements by Sign", duration: "21:37" },
+                { id: 27, title: "Next Permutation", duration: "28:15" },
+                { id: 28, title: "Leaders in an Array", duration: "11:53" },
+                { id: 29, title: "Longest Consecutive Sequence", duration: "23:11" },
+                { id: 30, title: "Set Matrix Zeroes", duration: "30:07" },
+                { id: 31, title: "Rotate Matrix/Image by 90 Degrees", duration: "17:47" },
+                { id: 32, title: "Spiral Traversal of a Matrix", duration: "16:33" },
+                { id: 33, title: "Count Subarray sum Equals K", duration: "24:09" },
+                { id: 34, title: "Pascal Triangle", duration: "26:45" },
+                { id: 35, title: "Majority Element II", duration: "26:58" },
+                { id: 36, title: "3 Sum", duration: "38:25" },
+                { id: 37, title: "4 Sum", duration: "28:47" },
+                { id: 38, title: "Number of Subarrays with xor K", duration: "24:55" },
+                { id: 39, title: "Merge Overlapping Intervals", duration: "22:35" },
+                { id: 40, title: "Merge Sorted Arrays Without Extra Space", duration: "32:47" },
+                { id: 41, title: "Find the Missing and Repeating Number", duration: "42:24" },
+                { id: 42, title: "Count Inversions in an Array", duration: "24:17" },
+                { id: 43, title: "Reverse Pairs", duration: "32:26" },
+                { id: 44, title: "Maximum Product Subarray", duration: "20:27" },
+                ]
+            },
+            {
+                category: "Maths & Number Theory",
+                phase: 1,
+                description: "Essential number theory for problem solving.",
+                videos: [
+                { id: 265, title: "L2. Print all Divisors", duration: "9:10" },
+                { id: 266, title: "L3. Check if Prime", duration: "7:10" },
+                { id: 267, title: "L4. Print all prime factors", duration: "18:53" },
+                { id: 268, title: "L5. Power Exponentiation", duration: "12:39" },
+                { id: 269, title: "L6. Sieve of Eratosthenes", duration: "18:27" },
+                { id: 270, title: "L7. Count Prime in range", duration: "16:39" },
+                { id: 271, title: "L8. Smallest Prime Factor (SPF)", duration: "16:57" },
+                ]
+            },
+
+            // --- PHASE 2: Core Interview DSA ---
+            {
+                category: "Binary Search",
+                phase: 2,
+                description: "Pattern recognition. Crack 70% of interviews.",
+                videos: [
+                { id: 45, title: "BS-1. Binary Search Introduction", duration: "33:27" },
+                { id: 46, title: "BS-2. Implement Lower Bound and Upper Bound", duration: "32:26" },
+                { id: 47, title: "BS-3. First and Last Occurrences in Array", duration: "25:28" },
+                { id: 48, title: "BS-4. Search Element in Rotated Sorted Array - I", duration: "16:38" },
+                { id: 49, title: "BS-5. Search Element in Rotated Sorted Array II", duration: "12:44" },
+                { id: 50, title: "BS-6. Minimum in Rotated Sorted Array", duration: "17:08" },
+                { id: 51, title: "BS-7. Find out how many times array has been rotated", duration: "5:01" },
+                { id: 52, title: "BS-8. Single Element in Sorted Array", duration: "22:16" },
+                { id: 53, title: "BS-9. Find Peak Element", duration: "32:53" },
+                { id: 54, title: "BS-10. Finding Sqrt of a number", duration: "17:11" },
+                { id: 55, title: "BS-11. Find the Nth root of an Integer", duration: "20:44" },
+                { id: 56, title: "BS-12. Koko Eating Bananas", duration: "21:04" },
+                { id: 57, title: "BS-13. Minimum days to make M bouquets", duration: "26:01" },
+                { id: 58, title: "BS-14. Find the Smallest Divisor", duration: "16:00" },
+                { id: 59, title: "BS-15. Capacity to Ship Packages", duration: "20:36" },
+                { id: 60, title: "BS-16. Kth Missing Positive Number", duration: "22:52" },
+                { id: 61, title: "BS-17. Aggressive Cows", duration: "26:44" },
+                { id: 62, title: "BS-18. Allocate Books", duration: "27:29" },
+                { id: 63, title: "BS 19. Painter's Partition", duration: "11:20" },
+                { id: 64, title: "BS-20. Minimise Maximum Distance Gas Stations", duration: "59:12" },
+                { id: 65, title: "BS 21: Median of two Sorted Arrays", duration: "15:59" },
+                { id: 66, title: "BS-21. Median of two Sorted Arrays (Intuition)", duration: "35:00" },
+                { id: 67, title: "Bs-22. K-th element of two sorted arrays", duration: "11:53" },
+                { id: 68, title: "BS 23. Row with maximum number of 1s", duration: "10:18" },
+                { id: 69, title: "BS-24. Search in a 2D Matrix - I", duration: "15:42" },
+                { id: 70, title: "BS-25. Search in a 2D Matrix - II", duration: "15:29" },
+                { id: 71, title: "BS-26. Find Peak Element-II", duration: "20:02" },
+                { id: 72, title: "BS-27. Median in a Row Wise Sorted Matrix", duration: "23:13" },
+                ]
+            },
+            {
+                category: "Linked List",
+                phase: 2,
+                description: "Pointer manipulation mastery.",
+                videos: [
+                { id: 237, title: "L1. Intro to LinkedList", duration: "45:17" },
+                { id: 238, title: "L2. Deletion and Insertion in LL", duration: "56:30" },
+                { id: 239, title: "L3. Intro to Doubly LinkedList", duration: "1:04:07" },
+                { id: 240, title: "L4. Reverse a DLL", duration: "18:30" },
+                { id: 241, title: "L5. Add 2 numbers in LL", duration: "14:48" },
+                { id: 242, title: "L6. Odd Even Linked List", duration: "24:05" },
+                { id: 243, title: "L7. Sort LL of 0's, 1's and 2's", duration: "23:23" },
+                { id: 244, title: "L8. Remove Nth Node from end", duration: "16:23" },
+                { id: 245, title: "L9. Reverse a LinkedList", duration: "32:42" },
+                { id: 246, title: "L10. Check if LL is Palindrome", duration: "20:02" },
+                { id: 247, title: "L11. Add 1 to a number in LL", duration: "25:28" },
+                { id: 248, title: "L12. Intersection point of Y LL", duration: "32:05" },
+                { id: 249, title: "L13. Find middle element", duration: "14:37" },
+                { id: 250, title: "L14. Detect loop in LL", duration: "20:26" },
+                { id: 251, title: "L15. Find length of Loop", duration: "14:01" },
+                { id: 252, title: "L16. Delete middle node", duration: "16:36" },
+                { id: 253, title: "L17. Find starting point of Loop", duration: "22:42" },
+                { id: 254, title: "L18. Delete all occurrences of Key in DLL", duration: "11:13" },
+                { id: 255, title: "L19. Find all Pairs with Sum in DLL", duration: "14:14" },
+                { id: 256, title: "L20. Remove duplicates from sorted DLL", duration: "12:53" },
+                { id: 257, title: "L21. Reverse Nodes in K Group", duration: "24:31" },
+                { id: 258, title: "L22. Rotate a LinkedList", duration: "12:10" },
+                { id: 259, title: "L23. Merge two sorted Linked Lists", duration: "18:55" },
+                { id: 260, title: "L24. Flattening a LinkedList", duration: "32:58" },
+                { id: 261, title: "L25. Merge K Sorted Lists", duration: "30:02" },
+                { id: 262, title: "L26. Sort a Linked List", duration: "22:11" },
+                { id: 263, title: "L27. Clone a LinkedList", duration: "33:00" },
+                { id: 264, title: "L28. Design a Browser History", duration: "14:38" },
+                ]
+            },
+            {
+                category: "Stack & Queue",
+                phase: 2,
+                description: "LIFO/FIFO logic and monotonic stack patterns.",
+                videos: [
+                { id: 297, title: "L1. Intro to Stack and Queue", duration: "1:05:06" },
+                { id: 298, title: "L2. Check for Balanced Parentheses", duration: "12:28" },
+                { id: 299, title: "L3. Prefix, Infix, Postfix", duration: "50:47" },
+                { id: 300, title: "L4. Implement Min Stack", duration: "20:55" },
+                { id: 301, title: "L5. Next Greater Element", duration: "18:25" },
+                { id: 302, title: "L6. Next Greater Element - II", duration: "15:41" },
+                { id: 303, title: "L7. Previous Smaller Element", duration: "8:11" },
+                { id: 304, title: "L8. Trapping Rainwater", duration: "28:58" },
+                { id: 305, title: "L9. Sum of Subarray Minimum", duration: "23:35" },
+                { id: 306, title: "L10. Sum of subarray ranges", duration: "10:34" },
+                { id: 307, title: "L11. Aestroid Collisions", duration: "17:28" },
+                { id: 308, title: "L12. Largest Rectangle in Histogram", duration: "31:42" },
+                { id: 309, title: "L13. Maximal Rectangle", duration: "12:12" },
+                { id: 310, title: "L14. Remove K Digits", duration: "15:29" },
+                { id: 311, title: "L15. Stock Span Problem", duration: "19:21" },
+                { id: 312, title: "L16. Sliding Window Maximum", duration: "19:58" },
+                { id: 313, title: "L17. The Celebrity Problem", duration: "16:17" },
+                { id: 314, title: "L18. Implement LRU Cache", duration: "24:56" },
+                { id: 315, title: "Implement LFU cache", duration: "17:44" },
+                ]
+            },
+            {
+                category: "Sliding Window & 2 Pointers",
+                phase: 2,
+                description: "Optimization techniques for arrays/strings.",
+                videos: [
+                { id: 272, title: "L1. Intro to Sliding Window", duration: "36:55" },
+                { id: 273, title: "L2. Max Points from Cards", duration: "11:13" },
+                { id: 274, title: "L3. Longest Substring No Repeats", duration: "23:09" },
+                { id: 275, title: "L4. Max Consecutive Ones III", duration: "29:58" },
+                { id: 276, title: "L5. Fruit Into Baskets", duration: "30:02" },
+                { id: 277, title: "L6. Longest Substring K Distinct", duration: "21:32" },
+                { id: 278, title: "L7. Number of Substrings All Three Chars", duration: "19:40" },
+                { id: 279, title: "L8. Longest Repeating Character Replacement", duration: "25:21" },
+                { id: 280, title: "L9. Binary Subarrays With Sum", duration: "20:27" },
+                { id: 281, title: "L10. Count number of Nice subarrays", duration: "4:54" },
+                { id: 282, title: "L11. Subarray with k different integers", duration: "20:49" },
+                { id: 283, title: "L12. Minimum Window Substring", duration: "27:06" },
+                ]
+            },
+            {
+                category: "Greedy Algorithms",
+                phase: 2,
+                description: "Local optimization for global solutions.",
+                videos: [
+                { id: 284, title: "L1. Assign Cookies", duration: "10:51" },
+                { id: 285, title: "L3. Shortest Job First", duration: "7:20" },
+                { id: 286, title: "L2. Lemonade Change", duration: "9:00" },
+                { id: 287, title: "L4. Jump Game - I", duration: "10:53" },
+                { id: 288, title: "L5. Jump Game - II", duration: "16:45" },
+                { id: 289, title: "L6. Job Sequencing Problem", duration: "16:07" },
+                { id: 290, title: "L7. N Meeting in One Room", duration: "13:12" },
+                { id: 291, title: "L8. Non Overlapping Intervals", duration: "8:46" },
+                { id: 292, title: "L9. Insert Intervals", duration: "13:16" },
+                { id: 293, title: "L10. Minimum platforms required", duration: "18:10" },
+                { id: 294, title: "L11. Valid Parenthesis String", duration: "26:09" },
+                { id: 295, title: "L13. Fractional Knapsack", duration: "18:41" },
+                { id: 296, title: "L12. Candy", duration: "30:10" },
+                ]
+            },
+
+            // --- PHASE 3: Big Tech Core ---
+            {
+                category: "Binary Trees",
+                phase: 3,
+                description: "Think like a Google/Microsoft engineer.",
+                videos: [
+                { id: 73, title: "L1. Introduction to Trees", duration: "9:50" },
+                { id: 74, title: "L2. Binary Tree Representation in C++", duration: "4:43" },
+                { id: 75, title: "L3. Binary Tree Representation in Java", duration: "4:12" },
+                { id: 76, title: "L4. Binary Tree Traversals", duration: "9:59" },
+                { id: 77, title: "L5. Preorder Traversal", duration: "7:29" },
+                { id: 78, title: "L6. Inorder Traversal", duration: "7:07" },
+                { id: 79, title: "L7. Postorder Traversal", duration: "5:31" },
+                { id: 80, title: "L8. Level Order Traversal", duration: "8:57" },
+                { id: 81, title: "L9. Iterative Preorder", duration: "6:50" },
+                { id: 82, title: "L10. Iterative Inorder", duration: "11:14" },
+                { id: 83, title: "L11. Iterative Postorder (2 Stack)", duration: "4:09" },
+                { id: 84, title: "L12. Iterative Postorder (1 Stack)", duration: "12:33" },
+                { id: 85, title: "L13. All Traversals in One", duration: "10:57" },
+                { id: 86, title: "L14. Maximum Depth in Binary Tree", duration: "8:05" },
+                { id: 87, title: "L15. Check for Balanced Binary Tree", duration: "12:30" },
+                { id: 88, title: "L16. Diameter of Binary Tree", duration: "13:47" },
+                { id: 89, title: "L17. Maximum Path Sum in Binary Tree", duration: "17:50" },
+                { id: 90, title: "L18. Check if two trees are Identical", duration: "4:18" },
+                { id: 91, title: "L19. Zig-Zag Traversal", duration: "8:21" },
+                { id: 92, title: "L20. Boundary Traversal", duration: "9:47" },
+                { id: 93, title: "L21. Vertical Order Traversal", duration: "18:53" },
+                { id: 94, title: "L22. Top View of Binary Tree", duration: "10:30" },
+                { id: 95, title: "L23. Bottom View of Binary Tree", duration: "13:13" },
+                { id: 96, title: "L24. Right/Left View", duration: "13:28" },
+                { id: 97, title: "L25. Check for Symmetrical Binary Trees", duration: "9:20" },
+                { id: 98, title: "L26. Print Root to Node Path", duration: "11:00" },
+                { id: 99, title: "L27. Lowest Common Ancestor", duration: "14:09" },
+                { id: 100, title: "L28. Maximum Width of Binary Tree", duration: "22:41" },
+                { id: 101, title: "L29. Children Sum Property", duration: "16:13" },
+                { id: 102, title: "L30. Print Nodes at distance K", duration: "17:42" },
+                { id: 103, title: "L31. Burn the Binary Tree", duration: "18:24" },
+                { id: 104, title: "L32. Count total Nodes (Complete BT)", duration: "16:13" },
+                { id: 105, title: "L33. Unique Binary Tree Req", duration: "8:41" },
+                { id: 106, title: "L34. Construct BT from Preorder/Inorder", duration: "18:52" },
+                { id: 107, title: "L35. Construct BT from Postorder/Inorder", duration: "19:46" },
+                { id: 108, title: "L36. Serialize and De-serialize", duration: "17:18" },
+                { id: 109, title: "L37. Morris Traversal", duration: "23:50" },
+                { id: 110, title: "L38. Flatten Binary Tree", duration: "21:51" },
+                ]
+            },
+            {
+                category: "Binary Search Trees (BST)",
+                phase: 3,
+                description: "Ordered tree structures.",
+                videos: [
+                { id: 111, title: "L39. Introduction to BST", duration: "8:54" },
+                { id: 112, title: "L40. Search in a BST", duration: "6:33" },
+                { id: 113, title: "L41. Ceil in a BST", duration: "5:36" },
+                { id: 114, title: "L42. Floor in a BST", duration: "5:00" },
+                { id: 115, title: "L43. Insert a Node in BST", duration: "8:18" },
+                { id: 116, title: "L44. Delete a Node in BST", duration: "15:48" },
+                { id: 117, title: "L45. K-th Smallest/Largest Element", duration: "8:27" },
+                { id: 118, title: "L46. Validate a BST", duration: "9:39" },
+                { id: 119, title: "L47. LCA in BST", duration: "8:06" },
+                { id: 120, title: "L48. Construct BST from Preorder", duration: "16:32" },
+                { id: 121, title: "L49. Inorder Successor/Predecessor", duration: "10:47" },
+                { id: 122, title: "L50. BST Iterator", duration: "14:00" },
+                { id: 123, title: "L51. Two Sum In BST", duration: "15:06" },
+                { id: 124, title: "L52. Recover BST", duration: "15:56" },
+                { id: 125, title: "L53. Largest BST in Binary Tree", duration: "17:27" },
+                ]
+            },
+            {
+                category: "Graphs",
+                phase: 3,
+                description: "Complex relationships and traversals.",
+                videos: [
+                { id: 126, title: "G-1. Introduction to Graph", duration: "13:43" },
+                { id: 127, title: "G-2. Graph Representation in C++", duration: "16:04" },
+                { id: 128, title: "G-3. Graph Representation in Java", duration: "13:13" },
+                { id: 129, title: "G-4. Connected Components", duration: "7:07" },
+                { id: 130, title: "G-5. Breadth-First Search (BFS)", duration: "20:00" }, 
+                { id: 131, title: "G-6. Depth-First Search (DFS)", duration: "20:00" }, 
+                { id: 132, title: "G-7. Number of Provinces", duration: "20:00" }, 
+                { id: 133, title: "G-8. Number of Islands", duration: "25:04" },
+                { id: 134, title: "G-9. Flood Fill Algorithm", duration: "20:34" },
+                { id: 135, title: "G-10. Rotten Oranges", duration: "22:30" },
+                { id: 136, title: "G-11. Detect Cycle (Undirected BFS)", duration: "20:19" },
+                { id: 137, title: "G-12. Detect Cycle (Undirected DFS)", duration: "19:10" },
+                { id: 138, title: "G-13. Distance of nearest cell having 1", duration: "20:21" },
+                { id: 139, title: "G-14. Surrounded Regions", duration: "23:17" },
+                { id: 140, title: "G-15. Number of Enclaves", duration: "15:34" },
+                { id: 141, title: "G-16. Number of Distinct Islands", duration: "18:02" },
+                { id: 142, title: "G-17. Bipartite Graph (BFS)", duration: "18:29" },
+                { id: 143, title: "G-18. Bipartite Graph (DFS)", duration: "18:00" }, 
+                { id: 144, title: "G-19. Detect cycle directed DFS", duration: "18:00" }, 
+                { id: 145, title: "G-20. Find Eventual Safe States", duration: "18:00" }, 
+                { id: 146, title: "G-21. Topological Sort", duration: "18:00" }, 
+                { id: 147, title: "G-22. Kahn's Algorithm", duration: "18:00" }, 
+                { id: 148, title: "G-23. Cycle in Directed Graph (BFS)", duration: "6:17" },
+                { id: 149, title: "G-24. Course Schedule I and II", duration: "11:32" },
+                { id: 150, title: "G-25. Find Eventual Safe States (BFS)", duration: "16:57" },
+                { id: 151, title: "G-26. Alien Dictionary", duration: "20:54" },
+                { id: 152, title: "G-27. Shortest Path in DAG", duration: "26:36" },
+                { id: 153, title: "G-28. Shortest Path Undirected Unit Weights", duration: "16:32" },
+                { id: 154, title: "G-29. Word Ladder - I", duration: "28:07" },
+                { id: 155, title: "G-30. Word Ladder - 2", duration: "25:42" },
+                { id: 156, title: "G-31. Word Ladder - 2 (Optimised)", duration: "23:40" },
+                { id: 157, title: "G-32. Dijkstra's Algorithm (PQ)", duration: "22:42" },
+                { id: 158, title: "G-33. Dijkstra's Algorithm (Set)", duration: "20:00" }, 
+                { id: 159, title: "G-34. Dijkstra's Algorithm Intuition", duration: "20:00" }, 
+                { id: 160, title: "G-35. Print Shortest Path", duration: "20:00" }, 
+                { id: 161, title: "G-36. Shortest Distance in Binary Maze", duration: "23:42" },
+                { id: 162, title: "G-37. Path With Minimum Effort", duration: "24:30" },
+                { id: 163, title: "G-38. Cheapest Flights Within K Stops", duration: "23:56" },
+                { id: 164, title: "G-39. Minimum Multiplications to Reach End", duration: "19:31" },
+                { id: 165, title: "G-40. Number of Ways to Arrive at Destination", duration: "24:06" },
+                { id: 166, title: "G-41. Bellman Ford Algorithm", duration: "27:43" },
+                { id: 167, title: "G-42. Floyd Warshall Algorithm", duration: "30:13" },
+                { id: 168, title: "G-43. Find City With Smallest Neighbors", duration: "12:56" },
+                { id: 169, title: "G-44. Minimum Spanning Tree", duration: "7:59" },
+                { id: 170, title: "G-45. Prim's Algorithm", duration: "19:10" },
+                { id: 171, title: "G-46. Disjoint Set", duration: "42:15" },
+                { id: 172, title: "G-47. Kruskal's Algorithm", duration: "13:11" },
+                { id: 173, title: "G-48. Number of Provinces (DSU)", duration: "8:03" },
+                { id: 174, title: "G-49. Number of Operations to Make Network Connected", duration: "14:48" },
+                { id: 175, title: "G-50. Accounts Merge", duration: "22:01" },
+                { id: 176, title: "G-51. Number of Islands II", duration: "20:00" }, 
+                { id: 177, title: "G-52. Making a Large Island", duration: "26:16" },
+                { id: 178, title: "G-53. Most Stones Removed", duration: "23:51" },
+                { id: 179, title: "G-54. Kosaraju's Algorithm", duration: "22:44" },
+                { id: 180, title: "G-55. Bridges in Graph", duration: "23:25" },
+                { id: 181, title: "G-56. Articulation Point", duration: "22:00" },
+                ]
+            },
+            {
+                category: "Dynamic Programming (DP)",
+                phase: 3,
+                description: "Optimization and breaking down problems.",
+                videos: [
+                { id: 182, title: "DP 1. Intro to DP", duration: "33:51" },
+                { id: 183, title: "DP 2. Climbing Stairs", duration: "13:17" },
+                { id: 184, title: "DP 3. Frog Jump", duration: "38:50" },
+                { id: 185, title: "DP 4. Frog Jump with K Distance", duration: "17:35" },
+                { id: 186, title: "DP 5. Max Sum Non-Adjacent", duration: "20:00" }, 
+                { id: 187, title: "DP 6. House Robber 2", duration: "20:00" }, 
+                { id: 188, title: "DP 7. Ninja's Training", duration: "20:00" }, 
+                { id: 189, title: "DP 8. Grid Unique Paths", duration: "20:00" }, 
+                { id: 190, title: "DP 9. Unique Paths 2", duration: "20:00" }, 
+                { id: 191, title: "DP 10. Minimum Path Sum", duration: "20:00" }, 
+                { id: 192, title: "DP 11. Triangle", duration: "34:39" },
+                { id: 193, title: "DP 12. Min/Max Falling Path Sum", duration: "42:38" },
+                { id: 194, title: "DP 13. Cherry Pickup II", duration: "43:23" },
+                { id: 195, title: "DP 14. Subset Sum Equals to Target", duration: "38:49" },
+                { id: 196, title: "DP 15. Partition Equal Subset Sum", duration: "9:43" },
+                { id: 197, title: "Dp 16. Partition into Two Subsets Min Diff", duration: "29:50" },
+                { id: 198, title: "DP 17. Counts Subsets with Sum K", duration: "36:57" },
+                { id: 199, title: "DP 18. Count Partitions With Given Difference", duration: "18:00" },
+                { id: 200, title: "DP 19. 0/1 Knapsack", duration: "41:19" },
+                { id: 201, title: "DP 20. Minimum Coins", duration: "34:15" },
+                { id: 202, title: "DP 21. Target Sum", duration: "9:04" },
+                { id: 203, title: "DP 22. Coin Change 2", duration: "22:17" },
+                { id: 204, title: "DP 23. Unbounded Knapsack", duration: "22:54" },
+                { id: 205, title: "DP 24. Rod Cutting Problem", duration: "22:54" },
+                { id: 206, title: "Dp 25. Longest Common Subsequence", duration: "47:09" },
+                { id: 207, title: "DP 26. Print LCS", duration: "16:55" },
+                { id: 208, title: "DP 27. Longest Common Substring", duration: "14:01" },
+                { id: 209, title: "DP 28. Longest Palindromic Subsequence", duration: "9:38" },
+                { id: 210, title: "DP 29. Min Insertions to Make Palindrome", duration: "12:00" },
+                { id: 211, title: "DP 30. Min Insertions/Deletions String A to B", duration: "7:30" },
+                { id: 212, title: "DP 31. Shortest Common Supersequence", duration: "26:44" },
+                { id: 213, title: "DP 32. Distinct Subsequences", duration: "40:15" },
+                { id: 214, title: "DP 33. Edit Distance", duration: "37:39" },
+                { id: 215, title: "DP 34. Wildcard Matching", duration: "43:52" },
+                { id: 216, title: "DP 36. Buy and Sell Stock - II", duration: "35:34" },
+                { id: 217, title: "DP 37. Buy and Sell Stocks III", duration: "31:50" },
+                { id: 218, title: "DP 38. Buy and Stock Sell IV", duration: "12:24" },
+                { id: 219, title: "DP 39. Buy and Sell Stocks With Cooldown", duration: "15:21" },
+                { id: 220, title: "DP 40. Buy and Sell Stocks With Transaction Fee", duration: "7:20" },
+                { id: 221, title: "DP 41. Longest Increasing Subsequence", duration: "24:35" },
+                { id: 222, title: "DP 42. Printing LIS", duration: "25:57" },
+                { id: 223, title: "DP 43. LIS Binary Search", duration: "16:27" },
+                { id: 224, title: "DP 44. Largest Divisible Subset", duration: "14:39" },
+                { id: 225, title: "DP 45. Longest String Chain", duration: "16:57" },
+                { id: 226, title: "DP 46. Longest Bitonic Subsequence", duration: "13:52" },
+                { id: 227, title: "DP 47. Number of LIS", duration: "20:46" },
+                { id: 228, title: "DP 48. Matrix Chain Multiplication", duration: "53:41" },
+                { id: 229, title: "DP 49. MCM Tabulation", duration: "9:08" },
+                { id: 230, title: "DP 50. Minimum Cost to Cut the Stick", duration: "30:02" },
+                { id: 231, title: "DP 51. Burst Balloons", duration: "34:00" },
+                { id: 232, title: "DP 52. Evaluate Boolean Expression", duration: "34:55" },
+                { id: 233, title: "DP 53. Palindrome Partitioning - II", duration: "23:17" },
+                { id: 234, title: "DP 54. Partition Array for Max Sum", duration: "21:39" },
+                { id: 235, title: "DP 55. Maximum Rectangle Area", duration: "11:04" },
+                { id: 236, title: "DP 56. Count Square Submatrices", duration: "15:59" },
+                ]
+            }
+        ];
+
+        // Helper to flatten list for index calculations
+        const FLATTENED_VIDEOS = COURSE_DATA.reduce((acc, cat) => [...acc, ...cat.videos], []);
+        const TOTAL_VIDEOS = FLATTENED_VIDEOS.length;
+
+        // Phase Definitions
+        const PHASES = [
+            { 
+                id: 0, 
+                title: "Phase 0: Setup & Orientation", 
+                duration: "Week 0 (3-4 Days)", 
+                goal: "Remove friction, don't learn DSA here.",
+                exitCriteria: ["Dev environment ready", "One language fixed", "TC/SC explained"],
+                color: "from-gray-500 to-slate-500" 
+            },
+            { 
+                id: 1, 
+                title: "Phase 1: Foundations", 
+                duration: "Weeks 1-4", 
+                goal: "Build thinking muscles. Logic > Speed.",
+                exitCriteria: ["Convert brute -> optimal", "Use hashing instinctively", "Recursion without fear"],
+                color: "from-blue-500 to-cyan-500" 
+            },
+            { 
+                id: 2, 
+                title: "Phase 2: Core Interview DSA", 
+                duration: "Weeks 5-8", 
+                goal: "Crack 70% interview questions. Pattern recognition.",
+                exitCriteria: ["Solve LC Medium ≤ 30 mins", "Identify pattern in 5 mins", "Explain tradeoffs"],
+                color: "from-indigo-500 to-purple-500" 
+            },
+            { 
+                id: 3, 
+                title: "Phase 3: Big Tech Core", 
+                duration: "Weeks 9-14", 
+                goal: "Think like a Google/Microsoft engineer. Depth.",
+                exitCriteria: ["Break DP into states", "Explain graph traversal", "Handle edge cases"],
+                color: "from-purple-500 to-pink-500" 
+            },
+            { 
+                id: 4, 
+                title: "Phase 4: Interview Mode", 
+                duration: "Weeks 15-18", 
+                goal: "Convert prep -> Offer. Performance under pressure.",
+                exitCriteria: ["Solve under time pressure", "Communicate clearly", "Stay calm when stuck"],
+                color: "from-pink-500 to-rose-500" 
+            }
+        ];
+
+        // --- UTILS ---
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'Just now';
+            const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        };
+
+        // --- COMPONENTS ---
+
+        // 1. Comment/Notes Modal
+        const CommentModal = ({ video, onClose, user }) => {
+            const [comments, setComments] = useState([]);
+            const [newComment, setNewComment] = useState('');
+            const [loading, setLoading] = useState(true);
+            const scrollRef = useRef(null);
+
+            useEffect(() => {
+                if (!video) return;
+                const q = query(
+                    collection(db, 'artifacts', APP_ID, 'public', 'data', `comments_${video.id}`),
+                    orderBy('createdAt', 'asc')
+                );
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setComments(msgs);
+                    setLoading(false);
+                    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                });
+                return () => unsubscribe();
+            }, [video]);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!newComment.trim() || !user) return;
+                try {
+                    await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', `comments_${video.id}`), {
+                        text: newComment,
+                        userId: user.uid,
+                        userName: `Coder ${user.uid.slice(0, 4)}`, // Anonymous name
+                        createdAt: serverTimestamp()
+                    });
+                    setNewComment('');
+                } catch (err) {
+                    console.error("Error posting comment", err);
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+                        <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800 rounded-t-xl">
+                            <h3 className="font-semibold text-white truncate pr-4">Discussion: {video.title}</h3>
+                            <button onClick={onClose} className="text-slate-400 hover:text-white transition">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900">
+                            {loading ? (
+                                <div className="text-center text-slate-500 py-10">Loading community notes...</div>
+                            ) : comments.length === 0 ? (
+                                <div className="text-center text-slate-600 py-10">
+                                    <MessageSquare className="mx-auto mb-2 opacity-50" size={32} />
+                                    <p>No notes yet. Be the first!</p>
+                                </div>
+                            ) : (
+                                comments.map((c) => (
+                                    <div key={c.id} className={`flex flex-col ${c.userId === user?.uid ? 'items-end' : 'items-start'}`}>
+                                        <div className={`max-w-[85%] rounded-lg p-3 ${c.userId === user?.uid ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-200'}`}>
+                                            <p className="text-sm">{c.text}</p>
+                                        </div>
+                                        <span className="text-xs text-slate-500 mt-1 px-1">
+                                            {c.userName} • {formatDate(c.createdAt)}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
+                            <div ref={scrollRef} />
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="p-4 bg-slate-800 border-t border-slate-700 rounded-b-xl flex gap-2">
+                            <input
+                                type="text"
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                placeholder="Share a tip or ask a question..."
+                                className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <button 
+                                type="submit" 
+                                disabled={!newComment.trim()}
+                                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium transition"
+                            >
+                                Send
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. Main App Component
+        const App = () => {
+            // Firebase State
+            const [user, setUser] = useState(null);
+            const [progress, setProgress] = useState({}); // { videoId: { complete: bool, confidence: int, revisited: bool } }
+            const [startDate, setStartDate] = useState(null);
+            const [monthsTarget, setMonthsTarget] = useState(5); 
+            
+            // UI State
+            const [loading, setLoading] = useState(true);
+            const [activeVideo, setActiveVideo] = useState(null); 
+            const [expandedCategories, setExpandedCategories] = useState({});
+            const [activeTab, setActiveTab] = useState('tracker'); // 'roadmap', 'tracker', 'rules'
+
+            // --- LOGIC: Authentication & Initial Data Fetch ---
+            useEffect(() => {
+                const init = async () => {
+                    // Simple anonymous auth for standalone file
+                    await signInAnonymously(auth);
+                };
+                
+                init();
+                
+                const unsubscribe = onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        setUser(u);
+                        // 2. Fetch User Data (Progress + StartDate)
+                        const userRef = doc(db, 'artifacts', APP_ID, 'users', u.uid, 'userData', 'profile');
+                        const snap = await getDoc(userRef);
+                        
+                        if (snap.exists()) {
+                            const data = snap.data();
+                            setProgress(data.progress || {});
+                            setStartDate(data.startDate ? new Date(data.startDate.seconds * 1000) : new Date());
+                            if (data.targetMonths) setMonthsTarget(data.targetMonths);
+                        } else {
+                            // New User Setup
+                            const now = new Date();
+                            setStartDate(now);
+                            await setDoc(userRef, {
+                                startDate: serverTimestamp(),
+                                progress: {},
+                                targetMonths: 5
+                            });
+                        }
+                        setLoading(false);
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // --- LOGIC: Progress Updates ---
+            const getProgressItem = (vidId) => {
+                const item = progress[vidId];
+                if (typeof item === 'boolean') { // Legacy support
+                    return { complete: item, confidence: 0, revisited: false };
+                }
+                return item || { complete: false, confidence: 0, revisited: false };
+            };
+
+            const updateProgress = async (vidId, updates) => {
+                if (!user) return;
+                const currentItem = getProgressItem(vidId);
+                const newItem = { ...currentItem, ...updates };
+                
+                // Optimistic UI
+                const newProgress = { ...progress, [vidId]: newItem };
+                setProgress(newProgress);
+
+                // DB Update
+                const userRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'userData', 'profile');
+                await updateDoc(userRef, {
+                    [`progress.${vidId}`]: newItem
+                }).catch(err => {
+                    console.error("Failed to save progress", err);
+                    setProgress(progress); // Revert
+                });
+            };
+
+            const updateTargetMonths = async (months) => {
+                setMonthsTarget(months);
+                if(user) {
+                    const userRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'userData', 'profile');
+                    await updateDoc(userRef, { targetMonths: months });
+                }
+            };
+
+            const toggleCategory = (catName) => {
+                setExpandedCategories(prev => ({
+                    ...prev,
+                    [catName]: !prev[catName]
+                }));
+            };
+
+            // --- CALCULATIONS: Pacing & Metrics ---
+            const stats = useMemo(() => {
+                if (!startDate) return { completed: 0, percentage: 0, expectedIndex: 0, status: 'neutral', expectedPhase: 0 };
+
+                let completedCount = 0;
+                let confidenceSum = 0;
+                let ratedCount = 0;
+                
+                Object.values(progress).forEach(p => {
+                    const item = (typeof p === 'boolean') ? { complete: p, confidence: 0 } : p;
+                    if (item.complete) completedCount++;
+                    if (item.confidence > 0) {
+                        confidenceSum += item.confidence;
+                        ratedCount++;
+                    }
+                });
+
+                const percentage = Math.round((completedCount / TOTAL_VIDEOS) * 100);
+                const avgConfidence = ratedCount > 0 ? (confidenceSum / ratedCount).toFixed(1) : "0.0";
+                
+                const now = new Date();
+                const daysSinceStart = Math.max(0, (now - startDate) / (1000 * 60 * 60 * 24));
+                const totalDays = monthsTarget * 30;
+                
+                // Linear projection
+                let expectedIndex = Math.floor((daysSinceStart / totalDays) * TOTAL_VIDEOS);
+                if (expectedIndex > TOTAL_VIDEOS) expectedIndex = TOTAL_VIDEOS;
+
+                // --- PHASE MAPPING LOGIC ---
+                const PHASE_WEIGHTS = [0.03, 0.22, 0.22, 0.35, 0.18];
+                let cumulative = 0;
+                let expectedPhaseId = 0;
+                const progressRatio = Math.min(1, daysSinceStart / totalDays);
+
+                for (let i = 0; i < PHASE_WEIGHTS.length; i++) {
+                    cumulative += PHASE_WEIGHTS[i];
+                    if (progressRatio <= cumulative) {
+                        expectedPhaseId = i;
+                        break;
+                    }
+                }
+                if (progressRatio >= 0.99) expectedPhaseId = 4; // Cap at last phase if near end
+
+                // Status Determination
+                const actualIndex = completedCount; 
+                let status = 'On Track';
+                let statusColor = 'text-green-400';
+                let diff = actualIndex - expectedIndex;
+
+                if (diff < -5) {
+                    status = `Behind by ${Math.abs(diff)} videos`;
+                    statusColor = 'text-red-400';
+                } else if (diff > 5) {
+                    status = `Ahead by ${diff} videos`;
+                    statusColor = 'text-indigo-400';
+                }
+
+                // Phase Progress
+                const phaseProgress = PHASES.map(phase => {
+                    if (phase.id === 4) return { id: 4, count: 0, total: 0, percent: 0 }; // Manual phase
+                    const phaseVideos = COURSE_DATA.filter(c => c.phase === phase.id).reduce((acc, c) => acc + c.videos.length, 0);
+                    const phaseCompleted = COURSE_DATA.filter(c => c.phase === phase.id).reduce((acc, c) => {
+                        return acc + c.videos.filter(v => getProgressItem(v.id).complete).length;
+                    }, 0);
+                    return {
+                        id: phase.id,
+                        count: phaseCompleted,
+                        total: phaseVideos,
+                        percent: phaseVideos === 0 ? 0 : Math.round((phaseCompleted / phaseVideos) * 100)
+                    };
+                });
+
+                return { 
+                    completed: completedCount, 
+                    percentage, 
+                    expectedIndex, 
+                    status, 
+                    statusColor, 
+                    daysSinceStart, 
+                    totalDays,
+                    avgConfidence,
+                    phaseProgress,
+                    expectedPhaseId
+                };
+            }, [progress, startDate, monthsTarget]);
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+                            <p className="text-slate-400 animate-pulse">Syncing with database...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Grouped Categories for Tracker View
+            const renderPhaseGroup = (phaseId) => {
+                const modules = COURSE_DATA.filter(c => c.phase === phaseId);
+                return modules.map((module, mIdx) => {
+                    const completedInModule = module.videos.filter(v => getProgressItem(v.id).complete).length;
+                    const totalInModule = module.videos.length;
+                    const isComplete = completedInModule === totalInModule;
+                    const isOpen = expandedCategories[module.category];
+
+                    return (
+                        <div key={mIdx} className={`mb-4 border rounded-xl overflow-hidden transition-all duration-300 ${isComplete ? 'border-indigo-900/30 bg-indigo-950/5' : 'border-slate-800 bg-slate-900/50'}`}>
+                            {/* Module Header */}
+                            <button 
+                                onClick={() => toggleCategory(module.category)}
+                                className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    {isOpen ? <ChevronDown size={18} className="text-slate-400"/> : <ChevronRight size={18} className="text-slate-400"/>}
+                                    <div className="text-left">
+                                        <h3 className={`font-semibold ${isComplete ? 'text-indigo-400' : 'text-slate-200'}`}>
+                                            {module.category}
+                                        </h3>
+                                        <p className="text-xs text-slate-500">{module.description}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs text-slate-500 font-mono">{completedInModule}/{totalInModule}</span>
+                                    {isComplete && <CheckCircle2 className="text-indigo-500" size={20}/>}
+                                </div>
+                            </button>
+
+                            {/* Video List */}
+                            {isOpen && (
+                                <div className="border-t border-slate-800/50 divide-y divide-slate-800/50">
+                                    {module.videos.map((video) => {
+                                        const item = getProgressItem(video.id);
+                                        return (
+                                            <div 
+                                                key={video.id} 
+                                                className={`group flex flex-col md:flex-row md:items-center justify-between p-3 pl-10 hover:bg-slate-800/40 transition-colors ${item.complete ? 'bg-slate-900/30' : ''}`}
+                                            >
+                                                <div className="flex items-start gap-4 flex-1 min-w-0 mb-2 md:mb-0">
+                                                    <button 
+                                                        onClick={() => updateProgress(video.id, { complete: !item.complete })}
+                                                        className={`mt-1 transition-all duration-200 ${item.complete ? 'text-indigo-500 scale-110' : 'text-slate-600 hover:text-slate-400'}`}
+                                                    >
+                                                        {item.complete ? <CheckCircle2 size={22} fill="currentColor" className="text-slate-950" /> : <Circle size={22} />}
+                                                    </button>
+                                                    
+                                                    <div className="truncate pr-4">
+                                                        <p className={`text-sm truncate ${item.complete ? 'text-slate-500 line-through decoration-slate-600' : 'text-slate-200'}`}>
+                                                            {video.title}
+                                                        </p>
+                                                        <div className="flex items-center gap-3 mt-1.5">
+                                                            <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 flex items-center gap-1">
+                                                                <Clock size={10} /> {video.duration}
+                                                            </span>
+                                                            
+                                                            {/* Confidence Rater */}
+                                                            {item.complete && (
+                                                                <div className="flex items-center gap-0.5">
+                                                                    {[1, 2, 3, 4, 5].map((star) => (
+                                                                        <button
+                                                                            key={star}
+                                                                            onClick={() => updateProgress(video.id, { confidence: star })}
+                                                                            className={`text-[10px] ${item.confidence >= star ? 'text-yellow-500' : 'text-slate-700 hover:text-yellow-600'}`}
+                                                                        >
+                                                                            <Star size={12} fill={item.confidence >= star ? "currentColor" : "none"} />
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 pl-10 md:pl-0">
+                                                    {/* Revisit Toggle */}
+                                                    {item.complete && (
+                                                        <button
+                                                            onClick={() => updateProgress(video.id, { revisited: !item.revisited })}
+                                                            className={`p-1.5 rounded text-xs flex items-center gap-1 ${item.revisited ? 'text-green-400 bg-green-400/10' : 'text-slate-600 hover:text-slate-400'}`}
+                                                            title="Mark as Revisited"
+                                                        >
+                                                            <RefreshCw size={14} className={item.revisited ? '' : ''} />
+                                                            {item.revisited ? 'Revisited' : ''}
+                                                        </button>
+                                                    )}
+                                                    
+                                                    <button 
+                                                        onClick={() => setActiveVideo(video)}
+                                                        className="p-2 text-slate-600 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
+                                                        title="Open Notes & Comments"
+                                                    >
+                                                        <MessageSquare size={18} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    );
+                });
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500/30 flex flex-col">
+                    
+                    {/* TOP DASHBOARD (Compact) */}
+                    <div className="bg-slate-950/90 border-b border-slate-800 sticky top-0 z-30 backdrop-blur-md">
+                        <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                                        Striver's A2Z Phase Tracker
+                                    </h1>
+                                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mt-1">
+                                        Day {Math.floor(stats.daysSinceStart)} • Target: {monthsTarget} Mo
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <div className={`font-mono font-bold text-sm ${stats.statusColor}`}>
+                                        {stats.status}
+                                    </div>
+                                    <div className="flex items-center justify-end gap-2 text-xs text-slate-400 mt-1">
+                                        <span className="flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-indigo-300">
+                                            <CalendarClock size={10} /> Expected: Phase {stats.expectedPhaseId}
+                                        </span>
+                                        <span>
+                                            {stats.completed}/{TOTAL_VIDEOS} Done
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Navigation Tabs */}
+                            <div className="flex gap-6 mt-4 text-sm font-medium">
+                                <button 
+                                    onClick={() => setActiveTab('roadmap')}
+                                    className={`pb-3 border-b-2 px-1 transition-colors ${activeTab === 'roadmap' ? 'border-indigo-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    Roadmap
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('tracker')}
+                                    className={`pb-3 border-b-2 px-1 transition-colors ${activeTab === 'tracker' ? 'border-indigo-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    Video Tracker
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('rules')}
+                                    className={`pb-3 border-b-2 px-1 transition-colors ${activeTab === 'rules' ? 'border-indigo-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    Rules & Metrics
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* MAIN CONTENT AREA */}
+                    <div className="flex-1 max-w-4xl mx-auto px-4 py-6 w-full pb-20">
+                        
+                        {/* --- TAB 1: ROADMAP --- */}
+                        {activeTab === 'roadmap' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {PHASES.map((phase) => {
+                                    const pStats = stats.phaseProgress.find(p => p.id === phase.id) || { percent: 0, count: 0, total: 0 };
+                                    const isCurrentExpected = stats.expectedPhaseId === phase.id;
+                                    
+                                    return (
+                                        <div key={phase.id} className={`relative pl-8 border-l ${isCurrentExpected ? 'border-indigo-500' : 'border-slate-800'}`}>
+                                            {/* Timeline Dot */}
+                                            <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gradient-to-br ${phase.color} shadow-[0_0_10px_rgba(99,102,241,0.5)] ${isCurrentExpected ? 'ring-2 ring-white scale-125' : ''}`}></div>
+                                            
+                                            <div className="mb-6">
+                                                <div className="flex justify-between items-baseline mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <h2 className={`text-lg font-bold bg-gradient-to-r ${phase.color} bg-clip-text text-transparent`}>
+                                                            {phase.title}
+                                                        </h2>
+                                                        {isCurrentExpected && (
+                                                            <span className="text-[10px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wide animate-pulse">
+                                                                Current Goal
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs font-mono text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">
+                                                        {phase.duration}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className={`bg-slate-900/50 border rounded-xl p-5 mb-3 ${isCurrentExpected ? 'border-indigo-500/40 bg-indigo-500/5' : 'border-slate-800'}`}>
+                                                    <p className="text-slate-300 italic mb-4 font-serif text-lg">"{phase.goal}"</p>
+                                                    
+                                                    <div className="grid md:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Exit Criteria</h4>
+                                                            <ul className="space-y-2">
+                                                                {phase.exitCriteria.map((crit, idx) => (
+                                                                    <li key={idx} className="flex items-start gap-2 text-sm text-slate-400">
+                                                                        <Target size={14} className="mt-0.5 text-slate-600" />
+                                                                        {crit}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                        {phase.id !== 4 && (
+                                                            <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 flex flex-col justify-center">
+                                                                <div className="flex justify-between text-xs text-slate-400 mb-2">
+                                                                    <span>Phase Progress</span>
+                                                                    <span>{pStats.percent}%</span>
+                                                                </div>
+                                                                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                                                    <div 
+                                                                        className={`h-full bg-gradient-to-r ${phase.color}`} 
+                                                                        style={{ width: `${pStats.percent}%` }}
+                                                                    />
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-600 mt-2 text-center">{pStats.count} / {pStats.total} Videos</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {phase.id === 4 && (
+                                                    <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-200/80">
+                                                        <AlertTriangle className="inline mr-2 mb-1" size={16}/>
+                                                        This phase is about mock interviews and re-solving hard problems. No new videos tracked here.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* --- TAB 2: TRACKER --- */}
+                        {activeTab === 'tracker' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {PHASES.filter(p => p.id !== 4).map((phase) => (
+                                    <div key={phase.id}>
+                                        <div className="sticky top-[110px] z-20 bg-slate-950/95 backdrop-blur py-2 mb-4 border-b border-slate-800 flex items-center gap-2">
+                                            <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${phase.color}`}></div>
+                                            <h2 className="font-bold text-slate-200">{phase.title}</h2>
+                                            {stats.expectedPhaseId === phase.id && (
+                                                <span className="text-[10px] bg-slate-800 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded ml-2">
+                                                    You should be here
+                                                </span>
+                                            )}
+                                        </div>
+                                        {renderPhaseGroup(phase.id)}
+                                    </div>
+                                ))}
+                                
+                                <div className="text-center py-10 opacity-50">
+                                    <Trophy size={48} className="mx-auto mb-4 text-slate-600" />
+                                    <h3 className="text-lg font-bold">Phase 4: The Final Stretch</h3>
+                                    <p className="text-sm">No videos here. Go to LeetCode/Gfg and practice efficiently!</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- TAB 3: RULES & METRICS --- */}
+                        {activeTab === 'rules' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {/* Stats Cards */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                                        <div className="text-slate-500 text-xs uppercase font-bold mb-1">Total Solved</div>
+                                        <div className="text-2xl font-bold text-white">{stats.completed}</div>
+                                    </div>
+                                    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                                        <div className="text-slate-500 text-xs uppercase font-bold mb-1">Confidence</div>
+                                        <div className="text-2xl font-bold text-yellow-500 flex items-center gap-1">
+                                            {stats.avgConfidence} <Star size={18} fill="currentColor"/>
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                                        <div className="text-slate-500 text-xs uppercase font-bold mb-1">Pace</div>
+                                        <div className={`text-lg font-bold ${stats.statusColor}`}>{stats.status.split(' ')[0]}</div>
+                                    </div>
+                                    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                                        <div className="text-slate-500 text-xs uppercase font-bold mb-1">Target</div>
+                                        <select 
+                                            value={monthsTarget} 
+                                            onChange={(e) => updateTargetMonths(Number(e.target.value))}
+                                            className="bg-transparent text-lg font-bold text-white outline-none w-full cursor-pointer"
+                                        >
+                                            <option value={3}>3 Months</option>
+                                            <option value={4}>4 Months</option>
+                                            <option value={4.5}>4.5 Mo</option>
+                                            <option value={5}>5 Months</option>
+                                            <option value={6}>6 Months</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Golden Rules */}
+                                <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6">
+                                    <h3 className="text-red-400 font-bold flex items-center gap-2 mb-4">
+                                        <AlertTriangle /> GOLDEN RULES (NON-NEGOTIABLE)
+                                    </h3>
+                                    <div className="space-y-4">
+                                        <div className="flex gap-3">
+                                            <span className="font-bold text-red-500/50 text-xl">01</span>
+                                            <div>
+                                                <h4 className="font-bold text-slate-200">Video → Problem → Explanation</h4>
+                                                <p className="text-sm text-slate-400">No video without solving problems. No skipping practice.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <span className="font-bold text-red-500/50 text-xl">02</span>
+                                            <div>
+                                                <h4 className="font-bold text-slate-200">30-Minute Struggle Rule</h4>
+                                                <p className="text-sm text-slate-400">Try 30 mins → Hints → Editorial → Re-solve next day.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <span className="font-bold text-red-500/50 text-xl">03</span>
+                                            <div>
+                                                <h4 className="font-bold text-slate-200">Mistake Log (Mandatory)</h4>
+                                                <p className="text-sm text-slate-400">Write down why it failed and what pattern fixed it.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <span className="font-bold text-red-500/50 text-xl">04</span>
+                                            <div>
+                                                <h4 className="font-bold text-slate-200">One Language Only</h4>
+                                                <p className="text-sm text-slate-400">Switching languages = restarting brain.</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <span className="font-bold text-red-500/50 text-xl">05</span>
+                                            <div>
+                                                <h4 className="font-bold text-slate-200">No Passive Watching</h4>
+                                                <p className="text-sm text-slate-400">If you can't pause and predict next step → Stop video.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-6 text-center">
+                                    <BrainCircuit className="mx-auto mb-3 text-indigo-400" size={32}/>
+                                    <h3 className="font-bold text-lg text-indigo-200 mb-2">Final Truth</h3>
+                                    <p className="text-slate-300 italic">"I don't aim to finish the playlist. I aim to finish interviews."</p>
+                                </div>
+                            </div>
+                        )}
+
+                    </div>
+
+                    {/* FOOTER */}
+                    <div className="fixed bottom-0 w-full bg-slate-950/80 backdrop-blur border-t border-slate-800 py-3 text-center text-xs text-slate-600 z-10">
+                        <p>Striver A2Z DSA Tracker • Phase-wise Architecture</p>
+                    </div>
+
+                    {/* MODAL */}
+                    {activeVideo && (
+                        <CommentModal 
+                            video={activeVideo} 
+                            onClose={() => setActiveVideo(null)} 
+                            user={user}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
