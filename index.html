@@ -45,7 +45,8 @@
             BrainCircuit, 
             Target, 
             AlertTriangle,
-            CalendarClock
+            CalendarClock,
+            Users
         } from 'https://esm.sh/lucide-react@0.292.0?deps=react@18.2.0';
 
         // Firebase Imports (Modular SDK from gstatic)
@@ -670,6 +671,10 @@
             const [expandedCategories, setExpandedCategories] = useState({});
             const [activeTab, setActiveTab] = useState('tracker'); // 'roadmap', 'tracker', 'rules'
 
+            // --- SHARED DOCUMENT REFERENCE ---
+            // Using a specific ID for the global tracker ensures everyone connects to the same doc
+            const sharedDocRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'trackers', 'global_a2z_tracker');
+
             // --- LOGIC: Authentication & Initial Data Fetch ---
             useEffect(() => {
                 const init = async () => {
@@ -679,32 +684,44 @@
                 
                 init();
                 
-                const unsubscribe = onAuthStateChanged(auth, async (u) => {
+                const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
                     if (u) {
                         setUser(u);
-                        // 2. Fetch User Data (Progress + StartDate)
-                        const userRef = doc(db, 'artifacts', APP_ID, 'users', u.uid, 'userData', 'profile');
-                        const snap = await getDoc(userRef);
-                        
-                        if (snap.exists()) {
-                            const data = snap.data();
-                            setProgress(data.progress || {});
-                            setStartDate(data.startDate ? new Date(data.startDate.seconds * 1000) : new Date());
-                            if (data.targetMonths) setMonthsTarget(data.targetMonths);
-                        } else {
-                            // New User Setup
-                            const now = new Date();
-                            setStartDate(now);
-                            await setDoc(userRef, {
-                                startDate: serverTimestamp(),
-                                progress: {},
-                                targetMonths: 5
-                            });
-                        }
-                        setLoading(false);
                     }
                 });
-                return () => unsubscribe();
+
+                // --- REAL-TIME SYNC LISTENER ---
+                // Replaces getDoc with onSnapshot for instant updates across all users
+                const unsubscribeSnapshot = onSnapshot(sharedDocRef, async (snap) => {
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        setProgress(data.progress || {});
+                        
+                        // Handle potential timestamp differences
+                        if (data.startDate) {
+                             // Firestore timestamps have a toDate() method, but basic objects don't
+                             const dateVal = data.startDate.toDate ? data.startDate.toDate() : new Date(data.startDate);
+                             setStartDate(dateVal);
+                        }
+                        
+                        if (data.targetMonths) setMonthsTarget(data.targetMonths);
+                    } else {
+                        // Initialize shared doc if it doesn't exist yet
+                         const now = new Date();
+                         await setDoc(sharedDocRef, {
+                            startDate: serverTimestamp(),
+                            progress: {},
+                            targetMonths: 5
+                        });
+                        setStartDate(now);
+                    }
+                    setLoading(false);
+                });
+
+                return () => {
+                    unsubscribeAuth();
+                    unsubscribeSnapshot();
+                };
             }, []);
 
             // --- LOGIC: Progress Updates ---
@@ -721,25 +738,28 @@
                 const currentItem = getProgressItem(vidId);
                 const newItem = { ...currentItem, ...updates };
                 
-                // Optimistic UI
+                // Optimistic UI Update (for immediate feedback)
                 const newProgress = { ...progress, [vidId]: newItem };
                 setProgress(newProgress);
 
-                // DB Update
-                const userRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'userData', 'profile');
-                await updateDoc(userRef, {
-                    [`progress.${vidId}`]: newItem
-                }).catch(err => {
+                // DB Update - Using setDoc with merge for granular updates
+                // This ensures we don't overwrite other users' changes to other videos
+                try {
+                    await setDoc(sharedDocRef, {
+                        progress: {
+                            [vidId]: newItem
+                        }
+                    }, { merge: true });
+                } catch (err) {
                     console.error("Failed to save progress", err);
-                    setProgress(progress); // Revert
-                });
+                    // Revert optimistic update if needed, though rare with firestore offline support
+                }
             };
 
             const updateTargetMonths = async (months) => {
                 setMonthsTarget(months);
                 if(user) {
-                    const userRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'userData', 'profile');
-                    await updateDoc(userRef, { targetMonths: months });
+                    await setDoc(sharedDocRef, { targetMonths: months }, { merge: true });
                 }
             };
 
@@ -962,9 +982,14 @@
                         <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
                             <div className="flex justify-between items-start mb-2">
                                 <div>
-                                    <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                                        Striver's A2Z Phase Tracker
-                                    </h1>
+                                    <div className="flex items-center gap-2">
+                                        <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                                            Striver's A2Z Phase Tracker
+                                        </h1>
+                                        <span className="bg-indigo-500/10 text-indigo-400 text-[10px] px-2 py-0.5 rounded border border-indigo-500/20 flex items-center gap-1">
+                                            <Users size={10} /> LIVE SHARED
+                                        </span>
+                                    </div>
                                     <p className="text-[10px] uppercase tracking-wider text-slate-500 mt-1">
                                         Day {Math.floor(stats.daysSinceStart)} • Target: {monthsTarget} Mo
                                     </p>
