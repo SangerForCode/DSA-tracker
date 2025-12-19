@@ -35,7 +35,8 @@ import {
   Trophy,
   BrainCircuit,
   Target,
-  AlertTriangle
+  AlertTriangle,
+  CalendarClock
 } from 'lucide-react';
 
 // --- DATA: Striver's A2Z DSA Course (Mapped to Phases) ---
@@ -611,7 +612,7 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [progress, setProgress] = useState({}); // { videoId: { complete: bool, confidence: int, revisited: bool } }
   const [startDate, setStartDate] = useState(null);
-  const [monthsTarget, setMonthsTarget] = useState(4.5); 
+  const [monthsTarget, setMonthsTarget] = useState(5); 
   
   // UI State
   const [loading, setLoading] = useState(true);
@@ -642,23 +643,21 @@ const App = () => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
         setUser(u);
-        // 2. Fetch User Data (Progress + StartDate)
-        const userRef = doc(db, 'artifacts', appId, 'users', u.uid, 'userData', 'profile');
-        const snap = await getDoc(userRef);
-        
+        // 2. Fetch Shared Tracker (Progress + StartDate)
+        const trackerRef = doc(db, 'artifacts', appId, 'shared', 'dsa-tracker');
+        const snap = await getDoc(trackerRef);
+
         if (snap.exists()) {
           const data = snap.data();
           setProgress(data.progress || {});
           setStartDate(data.startDate ? new Date(data.startDate.seconds * 1000) : new Date());
           if (data.targetMonths) setMonthsTarget(data.targetMonths);
         } else {
-          // New User Setup
-          const now = new Date();
-          setStartDate(now);
-          await setDoc(userRef, {
+          // Initialize shared tracker
+          await setDoc(trackerRef, {
             startDate: serverTimestamp(),
             progress: {},
-            targetMonths: 4.5
+            targetMonths: 5
           });
         }
         setLoading(false);
@@ -677,7 +676,7 @@ const App = () => {
     return item || { complete: false, confidence: 0, revisited: false };
   };
 
-  const updateProgress = async (vidId, updates) => {
+    const updateProgress = async (vidId, updates) => {
     if (!user) return;
     const currentItem = getProgressItem(vidId);
     const newItem = { ...currentItem, ...updates };
@@ -686,9 +685,9 @@ const App = () => {
     const newProgress = { ...progress, [vidId]: newItem };
     setProgress(newProgress);
 
-    // DB Update
-    const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'userData', 'profile');
-    await updateDoc(userRef, {
+    // DB Update (shared tracker)
+    const trackerRef = doc(db, 'artifacts', appId, 'shared', 'dsa-tracker');
+    await updateDoc(trackerRef, {
       [`progress.${vidId}`]: newItem
     }).catch(err => {
       console.error("Failed to save progress", err);
@@ -699,10 +698,32 @@ const App = () => {
   const updateTargetMonths = async (months) => {
     setMonthsTarget(months);
     if(user) {
-      const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'userData', 'profile');
-      await updateDoc(userRef, { targetMonths: months });
+      const trackerRef = doc(db, 'artifacts', appId, 'shared', 'dsa-tracker');
+      await updateDoc(trackerRef, { targetMonths: months });
     }
   };
+
+  // Realtime sync: subscribe to shared tracker after auth
+  useEffect(() => {
+    if (!user) return;
+
+    const trackerRef = doc(db, 'artifacts', appId, 'shared', 'dsa-tracker');
+
+    const unsub = onSnapshot(trackerRef, snap => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setProgress(data.progress || {});
+        if (data.startDate) {
+          setStartDate(new Date(data.startDate.seconds * 1000));
+        }
+        if (data.targetMonths) {
+          setMonthsTarget(data.targetMonths);
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [user]);
 
   const toggleCategory = (catName) => {
     setExpandedCategories(prev => ({
@@ -713,7 +734,7 @@ const App = () => {
 
   // --- CALCULATIONS: Pacing & Metrics ---
   const stats = useMemo(() => {
-    if (!startDate) return { completed: 0, percentage: 0, expectedIndex: 0, status: 'neutral' };
+    if (!startDate) return { completed: 0, percentage: 0, expectedIndex: 0, status: 'neutral', expectedPhase: 0 };
 
     let completedCount = 0;
     let confidenceSum = 0;
@@ -738,6 +759,28 @@ const App = () => {
     // Linear projection
     let expectedIndex = Math.floor((daysSinceStart / totalDays) * TOTAL_VIDEOS);
     if (expectedIndex > TOTAL_VIDEOS) expectedIndex = TOTAL_VIDEOS;
+
+    // --- PHASE MAPPING LOGIC ---
+    // Approximate distribution of time per phase based on curriculum weight
+    // P0 (Setup): ~3%
+    // P1 (Foundations): ~22%
+    // P2 (Core DSA): ~22%
+    // P3 (Big Tech Core): ~35%
+    // P4 (Interview Mode): ~18%
+    const PHASE_WEIGHTS = [0.03, 0.22, 0.22, 0.35, 0.18];
+    let cumulative = 0;
+    let expectedPhaseId = 0;
+    const progressRatio = Math.min(1, daysSinceStart / totalDays);
+
+    for (let i = 0; i < PHASE_WEIGHTS.length; i++) {
+      cumulative += PHASE_WEIGHTS[i];
+      if (progressRatio <= cumulative) {
+        expectedPhaseId = i;
+        break;
+      }
+    }
+    if (progressRatio >= 0.99) expectedPhaseId = 4; // Cap at last phase if near end
+
 
     // Status Determination
     const actualIndex = completedCount; 
@@ -777,7 +820,8 @@ const App = () => {
       daysSinceStart, 
       totalDays,
       avgConfidence,
-      phaseProgress
+      phaseProgress,
+      expectedPhaseId
     };
   }, [progress, startDate, monthsTarget]);
 
@@ -918,8 +962,13 @@ const App = () => {
               <div className={`font-mono font-bold text-sm ${stats.statusColor}`}>
                 {stats.status}
               </div>
-              <div className="text-xs text-slate-500">
-                {stats.completed}/{TOTAL_VIDEOS} Videos
+              <div className="flex items-center justify-end gap-2 text-xs text-slate-400 mt-1">
+                <span className="flex items-center gap-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-indigo-300">
+                  <CalendarClock size={10} /> Expected: Phase {stats.expectedPhaseId}
+                </span>
+                <span>
+                 {stats.completed}/{TOTAL_VIDEOS} Done
+                </span>
               </div>
             </div>
           </div>
@@ -956,23 +1005,31 @@ const App = () => {
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {PHASES.map((phase) => {
               const pStats = stats.phaseProgress.find(p => p.id === phase.id) || { percent: 0, count: 0, total: 0 };
+              const isCurrentExpected = stats.expectedPhaseId === phase.id;
               
               return (
-                <div key={phase.id} className="relative pl-8 border-l border-slate-800">
+                <div key={phase.id} className={`relative pl-8 border-l ${isCurrentExpected ? 'border-indigo-500' : 'border-slate-800'}`}>
                   {/* Timeline Dot */}
-                  <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gradient-to-br ${phase.color} shadow-[0_0_10px_rgba(99,102,241,0.5)]`}></div>
+                  <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gradient-to-br ${phase.color} shadow-[0_0_10px_rgba(99,102,241,0.5)] ${isCurrentExpected ? 'ring-2 ring-white scale-125' : ''}`}></div>
                   
                   <div className="mb-6">
                     <div className="flex justify-between items-baseline mb-2">
-                      <h2 className={`text-lg font-bold bg-gradient-to-r ${phase.color} bg-clip-text text-transparent`}>
-                        {phase.title}
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className={`text-lg font-bold bg-gradient-to-r ${phase.color} bg-clip-text text-transparent`}>
+                          {phase.title}
+                        </h2>
+                        {isCurrentExpected && (
+                           <span className="text-[10px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wide animate-pulse">
+                             Current Goal
+                           </span>
+                        )}
+                      </div>
                       <span className="text-xs font-mono text-slate-500 bg-slate-900 px-2 py-1 rounded border border-slate-800">
                         {phase.duration}
                       </span>
                     </div>
                     
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 mb-3">
+                    <div className={`bg-slate-900/50 border rounded-xl p-5 mb-3 ${isCurrentExpected ? 'border-indigo-500/40 bg-indigo-500/5' : 'border-slate-800'}`}>
                       <p className="text-slate-300 italic mb-4 font-serif text-lg">"{phase.goal}"</p>
                       
                       <div className="grid md:grid-cols-2 gap-4">
@@ -1025,6 +1082,11 @@ const App = () => {
                 <div className="sticky top-[110px] z-20 bg-slate-950/95 backdrop-blur py-2 mb-4 border-b border-slate-800 flex items-center gap-2">
                    <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${phase.color}`}></div>
                    <h2 className="font-bold text-slate-200">{phase.title}</h2>
+                   {stats.expectedPhaseId === phase.id && (
+                     <span className="text-[10px] bg-slate-800 text-indigo-300 border border-indigo-500/30 px-1.5 py-0.5 rounded ml-2">
+                       You should be here
+                     </span>
+                   )}
                 </div>
                 {renderPhaseGroup(phase.id)}
               </div>
@@ -1067,6 +1129,7 @@ const App = () => {
                    <option value={3}>3 Months</option>
                    <option value={4}>4 Months</option>
                    <option value={4.5}>4.5 Mo</option>
+                   <option value={5}>5 Months</option>
                    <option value={6}>6 Months</option>
                  </select>
               </div>
