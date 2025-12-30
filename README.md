@@ -26,7 +26,7 @@ This setup creates a powerful, serverless frontend that is easy to deploy and sh
 
 ## System Diagram
 ```mermaid
-graph TD
+flowchart TD
     subgraph "Clients"
         A[User's Browser]
         B[Collaborator's Browser]
